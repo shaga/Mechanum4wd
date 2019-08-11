@@ -10,30 +10,74 @@ const uint8_t MotorController::SpeedLevelMax = 255;
 const uint32_t MotorController::I2cClockHz = 100000;
 const i2c_port_t MotorController::I2cPortNum = I2C_NUM_0;
 
+const uint32_t MotorController::kPwmFrequency = 10000;
+
+bool MotorController::is_timer_initalized[] = {
+    false, false, false, false
+};
+
 bool MotorController::is_i2c_initialized_ = false;
 
 MotorController::MotorController(uint8_t addr) : addr_ (addr) {
 
 }
 
+MotorController::MotorController(gpio_num_t enable, gpio_num_t direction, ledc_timer_t timer, ledc_channel_t channel) :
+    enable_(enable),
+    direction_(direction),
+    timer_(timer),
+    channel_(channel) {
+
+}
+
 esp_err_t MotorController::initialize() {
     esp_err_t ret = ESP_OK;
 
-    if (!is_i2c_initialized_) {
-        ret = initI2c();
+    if (!is_timer_initalized[timer_]) {
+        // initialize ledc timer
+        ledc_timer_config_t timer_config;
+        timer_config.duty_resolution = LEDC_TIMER_16_BIT;
+        timer_config.freq_hz = kPwmFrequency;
+        timer_config.speed_mode = LEDC_HIGH_SPEED_MODE;
+        timer_config.timer_num = timer_;    
+
+        ret = ledc_timer_config(&timer_config);
+
+        is_timer_initalized[timer_] = ret == ESP_OK;
     }
 
     if (ret == ESP_OK) {
-        while ((ret = initDriver()) == ESP_ERR_INVALID_RESPONSE) {
-            vTaskDelay(100/portTICK_RATE_MS);
-        }
+        // initialize ledc channel
+        ledc_channel_config_t channel_config;
+        channel_config.channel = channel_;
+        channel_config.duty = 0;
+        channel_config.gpio_num = enable_;
+        channel_config.speed_mode = LEDC_HIGH_SPEED_MODE;
+        channel_config.timer_sel = timer_;
+
+        ret = ledc_channel_config(&channel_config);
     }
 
-    while (!isReady());
+    if (ret == ESP_OK) {
+        // initialize gpio for motor direction
+    }
 
-    while (isBusy());
 
-    //setEnable(true);
+    // if (!is_i2c_initialized_) {
+    //     ret = initI2c();
+    // }
+
+    // if (ret == ESP_OK) {
+    //     while ((ret = initDriver()) == ESP_ERR_INVALID_RESPONSE) {
+    //         vTaskDelay(100/portTICK_RATE_MS);
+    //     }
+    // }
+
+    // while (!isReady());
+
+    // while (isBusy());
+
+    // //setEnable(true);
 
     return ret;
 }

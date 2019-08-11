@@ -58,6 +58,7 @@
 #include "freertos/task.h"
 #include "driver/ledc.h"
 #include "MotorController.hpp"
+#include "MechanumDriver.hpp"
 #include "BtGamepad.hpp"
 
 //#define DEBUG_ONLY_PAD
@@ -65,9 +66,9 @@
 TaskHandle_t motor_control_task = NULL;
 
 //static BtGamepad* pgamepad = nullptr;
-static MotorController front_controller(0x59);
-static MotorController back_controller(0x58);
-
+// static MotorController front_controller(0x59);
+// static MotorController back_controller(0x58);
+static MechanumDriver mechanum_driver;
 
 static bool is_connected = false;
 
@@ -92,10 +93,10 @@ static void updateMotorSpeed(void* params) {
     while (true) {
         if (is_updated) {
             is_updated = false;
-            front_controller.drive(1, fl >= 0 ? MotorController::DirFore : MotorController::DirBack, (uint8_t)abs(fl));
-            front_controller.drive(0, fr >= 0 ? MotorController::DirFore : MotorController::DirBack, (uint8_t)abs(fr));
-            back_controller.drive(1, bl >= 0 ? MotorController::DirFore : MotorController::DirBack, (uint8_t)abs(bl));
-            back_controller.drive(0, br >= 0 ? MotorController::DirFore : MotorController::DirBack, (uint8_t)abs(br));
+            // front_controller.drive(1, fl >= 0 ? MotorController::DirFore : MotorController::DirBack, (uint8_t)abs(fl));
+            // front_controller.drive(0, fr >= 0 ? MotorController::DirFore : MotorController::DirBack, (uint8_t)abs(fr));
+            // back_controller.drive(1, bl >= 0 ? MotorController::DirFore : MotorController::DirBack, (uint8_t)abs(bl));
+            // back_controller.drive(0, br >= 0 ? MotorController::DirFore : MotorController::DirBack, (uint8_t)abs(br));
             vTaskDelay(20 / portTICK_PERIOD_MS);
         } else {
             vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -104,50 +105,13 @@ static void updateMotorSpeed(void* params) {
 #endif
 }
 
-static void initLed() {
-    esp_err_t ret = ESP_OK;
-
-    ledc_timer_config_t config;
-    config.duty_resolution = LEDC_TIMER_16_BIT;
-    config.freq_hz = 1;
-    config.speed_mode = LEDC_HIGH_SPEED_MODE;
-    config.timer_num = LEDC_TIMER_0;
-
-    ledc_timer_config(&config);
-
-    ledc_channel_config_t channel_config;
-    channel_config.channel = LEDC_CHANNEL_0;
-    channel_config.duty = 0;
-    channel_config.gpio_num = 17;
-    channel_config.speed_mode = LEDC_HIGH_SPEED_MODE;
-    channel_config.hpoint = 0;
-    channel_config.timer_sel = LEDC_TIMER_0;
-
-    ledc_channel_config(&channel_config);
-}
-
-static void setLedFreq(uint32_t freq) {
-    ledc_set_freq(LEDC_HIGH_SPEED_MODE, LEDC_TIMER_0, freq);
-}
-
-static void setLedDuty(uint8_t duty) {
-    if (duty > 100) duty = 100;
-
-    uint32_t value = 0xffff * duty / 100;
-
-    ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, value);
-    ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
-}
-
 static void updateGamepadConnection(EBtGamepadConnection_t state) {
     if (state == EBtGamepadConnection_t::PadConnected) {
-        setLedDuty(0);
         is_connected = true;
 #ifndef DEBUG_ONLY_PAD
         xTaskCreate(updateMotorSpeed, "motor_control", 1024, NULL, tskIDLE_PRIORITY, &motor_control_task);
 #endif
     } else {
-        setLedDuty(100);
         is_connected = false;
 #ifndef DEBUG_ONLY_PAD
         if (motor_control_task != NULL)
@@ -188,34 +152,82 @@ int btstack_main(int argc, const char * argv[]){
 
     
 #ifndef DEBUG_ONLY_PAD
-    initLed();
+    esp_err_t ret = mechanum_driver.Initialize();
+    printf("driver init ret=%d\n", ret);
+    // ledc_timer_config_t timer_config;
+    // timer_config.speed_mode = LEDC_HIGH_SPEED_MODE;
+    // timer_config.duty_resolution = LEDC_TIMER_16_BIT;
+    // timer_config.freq_hz = 1000;
+    // timer_config.timer_num = LEDC_TIMER_0;
+    
+    // ledc_timer_config(&timer_config);
 
-    setLedDuty(50);
+    // ledc_set_freq(LEDC_HIGH_SPEED_MODE, LEDC_TIMER_0, 1000);
 
-    setLedDuty(90);
+    // ledc_channel_config_t channel_config;
+    // channel_config.gpio_num = GPIO_NUM_22;
+    // channel_config.channel = LEDC_CHANNEL_0;
+    // channel_config.speed_mode = LEDC_HIGH_SPEED_MODE;
+    // channel_config.intr_type = LEDC_INTR_DISABLE;
+    // channel_config.timer_sel = LEDC_TIMER_0;
+    // channel_config.duty = 0xcfff;
+    // channel_config.hpoint = 0;
 
-    front_controller.initialize();
+    // ledc_channel_config(&channel_config);
 
-    front_controller.setEnable(true);
+    // gpio_config_t config;
+    // config.intr_type = GPIO_INTR_DISABLE;
+    // config.mode = GPIO_MODE_OUTPUT;
+    // config.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    // config.pull_up_en = GPIO_PULLUP_ENABLE;
+    // config.pin_bit_mask = (0x01 << GPIO_NUM_23);
+    // gpio_config(&config);
 
-    front_controller.drive(0, MotorController::DirFore, 0);
-    front_controller.drive(1, MotorController::DirFore, 0);
+    while (true) {
+        // gpio_set_level(GPIO_NUM_22, 1);
+        // gpio_set_level(GPIO_NUM_23, 0);
+        // ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, 0x8000);
+        // ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
+        mechanum_driver.Drive(0.01, 0, 0);
+        vTaskDelay(5000*portTICK_RATE_MS);
 
-    setLedDuty(50);
+        mechanum_driver.Drive(0, 0, 0);
+        vTaskDelay(1000*portTICK_RATE_MS);
+// //        gpio_set_level(GPIO_NUM_22, 0);
+//         ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, 0);
+//         ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
+//         vTaskDelay(3000*portTICK_RATE_MS);
 
-    back_controller.initialize();
+//         gpio_set_level(GPIO_NUM_23, 1);
+//         ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, 0xff);
+//         ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
+// //        gpio_set_level(GPIO_NUM_22, 1);
 
-    back_controller.setEnable(true);
+//         vTaskDelay(10000*portTICK_RATE_MS);
+// //        gpio_set_level(GPIO_NUM_22, 0);
+//         ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, 0);
+//         ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
+//         vTaskDelay(3000*portTICK_RATE_MS);
 
-    back_controller.drive(0, MotorController::DirFore, 0);
-    back_controller.drive(1, MotorController::DirFore, 0);
 
-    setLedDuty(10);
+    }
+
+    // gpio_set_level(GPIO_NUM_22, 0);
+
+
+
+    // mechanum_driver.Initialize();
+
+    // mechanum_driver.Drive(0.4, 0, 0);
+
+    // vTaskDelay(1000*portTICK_RATE_MS);
+
+    // mechanum_driver.Stop();
 #endif
 
-    BtGamepad* pad = BtGamepad::getInstance();
-    pad->registerCallbacks(updateGamepadConnection, updateGamepadState);
-    pad->initialize();
+    // BtGamepad* pad = BtGamepad::getInstance();
+    // pad->registerCallbacks(updateGamepadConnection, updateGamepadState);
+    // pad->initialize();
 
     return 0;
 }

@@ -3,6 +3,7 @@
 
 #include "esp_err.h"
 #include "driver/i2c.h"
+#include "driver/ledc.h"
 
 class MotorController {
 public:
@@ -17,7 +18,7 @@ public:
     static bool is_i2c_initialized_;
 
     MotorController(uint8_t addr);
-
+    MotorController(gpio_num_t enable, gpio_num_t direction, ledc_timer_t timer, ledc_channel_t channel);
 
     esp_err_t initialize();
     bool isReady();
@@ -31,6 +32,9 @@ public:
 private:
     static const i2c_port_t I2cPortNum;
     static const uint32_t I2cClockHz;
+    static const uint32_t kPwmFrequency;
+
+    static bool is_timer_initalized[LEDC_TIMER_MAX];
 
     enum {
         RegFid = 0x00,
@@ -156,7 +160,10 @@ private:
     esp_err_t readRegister(uint8_t offset, uint8_t *value);
 
     uint8_t addr_;
-
+    gpio_num_t enable_;
+    gpio_num_t direction_;
+    ledc_timer_t timer_;
+    ledc_channel_t channel_;
 };
 
 
